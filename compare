@@ -1,0 +1,107 @@
+#!/usr/bin/python3
+import csv
+import sys
+import os
+
+verbose = False
+consolidated = False
+output = "Results.csv"
+usage = "Usage: compare <then.csv> <now.csv> [options]" \
+        + os.linesep + "  -v, --verbose:".ljust(25) + "verbose output" \
+        + os.linesep + "  -o <Results.csv>:".ljust(25) + "specifies output csv file" \
+        + os.linesep + "  -h, --help:".ljust(25) + "display usage information"
+
+
+# executes the comparison of the given csv files for persistent CVEs
+def main():
+    # checks for an insufficient number of arguments
+    if len(sys.argv) < 3:
+        print(usage)
+        exit(1)
+    # stores the names of the csv files
+    elif len(sys.argv) > 2:
+        then_csv = sys.argv[1]
+        now_csv = sys.argv[2]
+    # processes remaining arguments (options)
+    if len(sys.argv) > 3:
+        process_arguments(sys.argv[3:])
+
+    try:
+        # reads/stores the data from the CSVs
+        then_hosts = read_csv(then_csv)
+        now_hosts = read_csv(now_csv)
+        # writes the duplicate results to a new CSV and returns the counts
+        count_map = write_results(then_hosts, now_hosts, output)
+        print("[{:,} Hosts Processed For \"{}\"]".format(len(then_hosts) - 1, then_csv))
+        print("[{:,} Hosts Processed For \"{}\"]".format(len(now_hosts) - 1, now_csv))
+        print("[{:,} Total Overlapping Hosts]".format(count_map['overlap'] - 1))
+        print("[{:,} Persistent CVEs Found]".format(count_map['cves'] - 1))
+    except FileNotFoundError as e:
+        print(e)
+        exit(1)
+
+
+# processes program options
+def process_arguments(args):
+    for i in range(0, len(args)):
+        arg = args[i]
+        # specifies the output file name
+        if arg == "-o" and len(args) > i + 1:
+            global output
+            output = args[i + 1]
+        # specifies a verbose print mode to output data to the console
+        elif arg == "-v" or arg == "--verbose":
+            global verbose
+            verbose = True
+        # prints the usage information
+        elif arg == "-h" or arg == "--help":
+            print(usage)
+            exit()
+
+
+# returns the IP/CVE data from the given CSV file
+def read_csv(file):
+    col_ip = 2
+    col_cves = 4
+    host_map = {}
+    with open(file, newline='') as csvfile:
+        first = csv.reader(csvfile)
+        for row in first:
+            if len(row) > 4:
+                ip = row[col_ip]
+                set_cve = set(row[col_cves].split(","))
+                # only stores non-empty sets of CVEs
+                if set_cve != {''}:
+                    if ip in host_map:
+                        host_map[ip].update(set_cve)
+                    else:
+                        host_map[ip] = set_cve
+    return host_map
+
+
+# returns the number of persistent CVEs and hosts after writing the data to the given CSV
+def write_results(then_hosts, now_hosts, results):
+    count_cves = 0
+    count_overlap = 0
+    with open(results, "w", newline='') as csvfile:
+        results = csv.writer(csvfile)
+        for now_ip, now_cve_list in now_hosts.items():
+            # checks if the IP is in both CSVs
+            if now_ip in then_hosts:
+                count_overlap += 1
+                if verbose:
+                    print("==" * 10)
+                    print(now_ip)
+                for now_cve in now_cve_list:
+                    # checks if the CVE from the 'now' host map is in the 'then' host map
+                    if now_cve in then_hosts[now_ip]:
+                        if verbose:
+                            print(now_cve)
+                        # writes the persistent data to the new CSV
+                        results.writerow([now_ip, now_cve])
+                        count_cves += 1
+    return {'cves': count_cves, 'overlap': count_overlap}
+
+
+if __name__ == "__main__":
+    main()
