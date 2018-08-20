@@ -5,10 +5,12 @@ import os
 
 verbose = False
 consolidated = False
+condensed = False
 output = "Results.csv"
 usage = "Usage: compare <then.csv> <now.csv> [options]" \
         + os.linesep + "  -v, --verbose:".ljust(25) + "verbose output" \
         + os.linesep + "  -o <Results.csv>:".ljust(25) + "specifies output csv file" \
+        + os.linesep + "  -c, --condense:".ljust(25) + "condenses the output to one host per line" \
         + os.linesep + "  -h, --help:".ljust(25) + "display usage information"
 
 
@@ -53,6 +55,10 @@ def process_arguments(args):
         elif arg == "-v" or arg == "--verbose":
             global verbose
             verbose = True
+        # consolidates the output to one host per line
+        elif arg == "-c" or arg == "--condense":
+            global condensed
+            condensed = True
         # prints the usage information
         elif arg == "-h" or arg == "--help":
             print(usage)
@@ -92,14 +98,20 @@ def write_results(then_hosts, now_hosts, results):
                 if verbose:
                     print("==" * 10)
                     print(now_ip)
+                out_cves = []
                 for now_cve in now_cve_list:
                     # checks if the CVE from the 'now' host map is in the 'then' host map
                     if now_cve in then_hosts[now_ip]:
                         if verbose:
                             print(now_cve)
-                        # writes the persistent data to the new CSV
-                        results.writerow([now_ip, now_cve])
+                        if condensed:
+                            out_cves.append(now_cve)
+                        else:
+                            # writes the persistent data to the new CSV
+                            results.writerow([now_ip, now_cve])
                         count_cves += 1
+                if out_cves:
+                    results.writerow([now_ip] + out_cves)
     return {'cves': count_cves, 'overlap': count_overlap}
 
 
