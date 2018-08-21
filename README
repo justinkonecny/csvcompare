@@ -1,0 +1,8 @@
+# csvcompare
+Compares columns in two CSVs to find duplicate entries
+
+Usage: compare <then.csv> <now.csv> [options]
+  -v, --verbose:         verbose output
+  -o <Results.csv>:      specifies output csv file
+  -c, --condense:        condenses the output to one host per line
+  -h, --help:            display usage information
